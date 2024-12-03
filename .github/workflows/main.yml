@@ -1,25 +1,27 @@
-name: Deploy DB
+name: "Terraform action"
 on:
   push:
     branches:
       - main
-  workflow_dispatch:
-
+  pull_request:
+permissions:
+      id-token: write # This is required for aws oidc connection
+      contents: read # This is required for actions/checkout
+      pull-requests: write # This is required for gh bot to comment PR
+env:
+  TF_LOG: INFO
+  AWS_REGION: ${{ secrets.AWS_REGION }}
 jobs:
   deploy:
     runs-on: ubuntu-latest
-
+    defaults:
+      run:
+        shell: bash
+        working-directory: .
     steps:
-      # Step 1: Checkout repository
-      - name: Checkout repository
-        uses: actions/checkout@v2
+      - name: Git checkout
+        uses: actions/checkout@v3
 
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v2
-        with:
-          cli_config_credentials_token: ${{ secrets.TF_API_TOKEN }}
-
-      # Step 3: Configure AWS credentials
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v3
         with:
@@ -27,10 +29,19 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}
 
-      # Step 4: Check/Create S3 bucket for Terraform state
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_version: 1.9.6
+
+      - name: Terraform fmt
+        id: fmt
+        run: terraform fmt -check
+        continue-on-error: true
+
       - name: Ensure S3 bucket exists
         run: |
-          bucket_name=my-s3-bucket-pos-tech-postgres
+          bucket_name=rds-fiap-bucket
           region=${{ secrets.AWS_REGION }}
           if aws s3 ls "s3://$bucket_name" 2>&1 | grep -q 'NoSuchBucket'; then
             echo "Creating S3 bucket: $bucket_name"
@@ -40,10 +51,6 @@ jobs:
             echo "S3 bucket already exists."
           fi
 
-      - name: Terraform Format
-        id: fmt
-        run: terraform fmt check
-
       - name: Terraform Init
         id: init
         run: terraform init
@@ -51,11 +58,53 @@ jobs:
       - name: Terraform Validate
         id: validate
         run: terraform validate -no-color
-        continue-on-error: true
 
       - name: Terraform Plan
         id: plan
-        run: terraform plan -var="region=${{ secrets.AWS_REGION }}" -var="aws_access_key=${{ secrets.AWS_ACCESS_KEY_ID }}" -var="aws_secret_key=${{ secrets.AWS_SECRET_ACCESS_KEY }}" -var="username=${{ secrets.DB_USERNAME }}" -var="password=${{ secrets.DB_PASSWORD }}"
+        run: terraform plan -no-color -var="region=${{ secrets.AWS_REGION }}" -var="aws_access_key=${{ secrets.AWS_ACCESS_KEY_ID }}" -var="aws_secret_key=${{ secrets.AWS_SECRET_ACCESS_KEY }}" -var="username=${{ secrets.DB_USERNAME }}" -var="password=${{ secrets.DB_PASSWORD }}"
+        if: github.event_name == 'pull_request'
+        continue-on-error: true
+
+      - uses: actions/github-script@v6
+        if: github.event_name == 'pull_request'
+        env:
+          PLAN: "terraform\n${{ steps.plan.outputs.stdout }}"
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const output = `#### Terraform Format and Style 🖌\`${{ steps.fmt.outcome }}\`
+            #### Terraform Initialization ⚙️\`${{ steps.init.outcome }}\`
+            #### Terraform Validation 🤖\`${{ steps.validate.outcome }}\`
+            <details><summary>Validation Output</summary>
+
+            \`\`\`\n
+            ${{ steps.validate.outputs.stdout }}
+            \`\`\`
+
+            </details>
+
+            #### Terraform Plan 📖\`${{ steps.plan.outcome }}\`
+
+            <details><summary>Show Plan</summary>
+
+            \`\`\`\n
+            ${process.env.PLAN}
+            \`\`\`
+
+            </details>
+
+            *Pushed by: @${{ github.actor }}, Action: \`${{ github.event_name }}\`*`;
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: output
+            })
+
+      - name: Terraform Plan Status
+        if: steps.plan.outcome == 'failure'
+        run: exit 1
 
       - name: Apply Terraform
         run: terraform apply -auto-approve -var="region=${{ secrets.AWS_REGION }}" -var="aws_access_key=${{ secrets.AWS_ACCESS_KEY_ID }}" -var="aws_secret_key=${{ secrets.AWS_SECRET_ACCESS_KEY }}" -var="username=${{ secrets.DB_USERNAME }}" -var="password=${{ secrets.DB_PASSWORD }}"
