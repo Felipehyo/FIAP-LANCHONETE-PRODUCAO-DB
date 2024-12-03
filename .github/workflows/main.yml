@@ -56,6 +56,7 @@ jobs:
           else
             echo "RDS instance does not exist."
             echo "exists=false" >> $GITHUB_ENV
+          fi
 
       # Step 7: Apply Terraform if RDS does not exist
       - name: Apply Terraform
