@@ -41,29 +41,24 @@ jobs:
             echo "S3 bucket already exists."
           fi
 
-      # Step 5: Initialize Terraform
-      - name: Initialize Terraform
+      - name: Terraform Format
+        id: fmt
+        run: terraform fmt check
+
+      - name: Terraform Init
+        id: init
         run: terraform init
 
-      # Step 6: Check if RDS instance exists
-      - name: Check if RDS instance exists
-        id: rds_check
-        run: |
-          existing_rds=$(aws rds describe-db-instances --query "DBInstances[?DBInstanceIdentifier=='fiap'].DBInstanceIdentifier" --output text)
-          if [ "$existing_rds" = "fiap" ]; then
-            echo "RDS instance already exists."
-            echo "exists=true" >> $GITHUB_ENV
-          else
-            echo "RDS instance does not exist."
-            echo "exists=false" >> $GITHUB_ENV
-          fi
+      - name: Terraform Validate
+        id: validate
+        run: terraform validate -no-color
+        continue-on-error: true
+
+      - name: Terraform Plan
+        id: plan
+        if: github.event_name == 'pull_request'
+        run: terraform plan -var="username=${{ secrets.DB_USERNAME }}" -var="password=${{ secrets.DB_PASSWORD }}"
 
       # Step 7: Apply Terraform if RDS does not exist
       - name: Apply Terraform
-        if: env.exists == 'false'
-        run: terraform apply -auto-approve
-
-      # Step 8: Skip Apply if RDS exists
-      - name: Skip Apply (RDS Exists)
-        if: env.exists == 'true'
-        run: echo "Skipping Terraform apply as RDS instance already exists."
+        run: terraform apply -auto-approve -var="username=${{ secrets.DB_USERNAME }}" -var="password=${{ secrets.DB_PASSWORD }}"
