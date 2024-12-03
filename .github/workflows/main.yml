@@ -22,9 +22,7 @@ jobs:
 
       - name: Check AWS Environment Variables
         run: |
-          echo "AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID"
-          echo "AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}"
-
+          echo "TEST=${{ secrets.TEST }}"
 
       # Step 2
       - name: Configure AWS credentials
