@@ -31,25 +31,23 @@ jobs:
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v2
-        with:
-          terraform_version: 1.9.6
 
       - name: Terraform fmt
         id: fmt
         run: terraform fmt -check
         continue-on-error: true
 
-      - name: Ensure S3 bucket exists
-        run: |
-          bucket_name=rds-fiap-bucket
-          region=${{ secrets.AWS_REGION }}
-          if aws s3 ls "s3://$bucket_name" 2>&1 | grep -q 'NoSuchBucket'; then
-            echo "Creating S3 bucket: $bucket_name"
-            aws s3api create-bucket --bucket $bucket_name --region $region --create-bucket-configuration LocationConstraint=$region
-            aws s3api put-bucket-versioning --bucket $bucket_name --versioning-configuration Status=Enabled
-          else
-            echo "S3 bucket already exists."
-          fi
+#      - name: Ensure S3 bucket exists
+#        run: |
+#          bucket_name=rds-fiap-bucket
+#          region=${{ secrets.AWS_REGION }}
+#          if aws s3 ls "s3://$bucket_name" 2>&1 | grep -q 'NoSuchBucket'; then
+#            echo "Creating S3 bucket: $bucket_name"
+#            aws s3api create-bucket --bucket $bucket_name --region $region --create-bucket-configuration LocationConstraint=$region
+#            aws s3api put-bucket-versioning --bucket $bucket_name --versioning-configuration Status=Enabled
+#          else
+#            echo "S3 bucket already exists."
+#          fi
 
       - name: Terraform Init
         id: init
@@ -108,4 +106,3 @@ jobs:
 
       - name: Apply Terraform
         run: terraform apply -auto-approve -var="region=${{ secrets.AWS_REGION }}" -var="aws_access_key=${{ secrets.AWS_ACCESS_KEY_ID }}" -var="aws_secret_key=${{ secrets.AWS_SECRET_ACCESS_KEY }}" -var="username=${{ secrets.DB_USERNAME }}" -var="password=${{ secrets.DB_PASSWORD }}"
-
