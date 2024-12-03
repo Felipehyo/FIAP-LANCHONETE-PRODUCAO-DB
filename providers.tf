@@ -1,4 +1,5 @@
 provider "aws" {
   profile = "default"
-  region  = var.region
+  shared_credentials_file = "/home/runner/.aws/credentials"
+  region  = "sa-east-1"
 }
