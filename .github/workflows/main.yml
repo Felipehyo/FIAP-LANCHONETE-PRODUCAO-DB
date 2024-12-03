@@ -27,29 +27,29 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}
 
-      # # Step 4
-      # - name: Initialize Terraform
-      #   run: terraform init
+      # Step 4
+      - name: Initialize Terraform
+        run: terraform init
 
-      # # Step 5
-      # - name: Check if RDS instance exists
-      #   id: rds_check
-      #   run: |
-      #     existing_rds=$(aws rds describe-db-instances --query "DBInstances[?DBInstanceIdentifier=='fiap'].DBInstanceIdentifier" --output text)
-      #     if [ "$existing_rds" = "fiap" ]; then
-      #       echo "RDS instance already exists."
-      #       echo "exists=true" >> $GITHUB_ENV
-      #     else
-      #       echo "RDS instance does not exist."
-      #       echo "exists=false" >> $GITHUB_ENV
-      #     fi
+      # Step 5
+      - name: Check if RDS instance exists
+        id: rds_check
+        run: |
+          existing_rds=$(aws rds describe-db-instances --query "DBInstances[?DBInstanceIdentifier=='fiap'].DBInstanceIdentifier" --output text)
+          if [ "$existing_rds" = "fiap" ]; then
+            echo "RDS instance already exists."
+            echo "exists=true" >> $GITHUB_ENV
+          else
+            echo "RDS instance does not exist."
+            echo "exists=false" >> $GITHUB_ENV
+          fi
 
-      # # Step 6
-      # - name: Apply Terraform
-      #   if: env.exists == 'false'
-      #   run: terraform apply -auto-approve
+      # Step 6
+      - name: Apply Terraform
+        if: env.exists == 'false'
+        run: terraform apply -auto-approve
 
-      # # Step 7
-      # - name: Skip Apply (RDS Exists)
-      #   if: env.exists == 'true'
-      #   run: echo "Skipping Terraform apply as RDS instance already exists."
+      # Step 7
+      - name: Skip Apply (RDS Exists)
+        if: env.exists == 'true'
+        run: echo "Skipping Terraform apply as RDS instance already exists."
